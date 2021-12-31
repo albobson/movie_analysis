@@ -7,7 +7,6 @@
 ## Ideas to expand on in the future:
 ## Time of year vs rating given
 ## Scatterplot of data by time of year
-## Corr plot to find which factors are most likely to influence higher ratings
 library(dplyr)
 
 movies_master = read.csv("20211231_movies.csv")
@@ -27,6 +26,18 @@ m[nonnums] = sapply(m[nonnums],as.character)
 ## Changing budget to millions
 m$budget = m$budget/1000000
 
+## Converting dates to class() = date
+m$watchdate = as.Date(as.character(m$watchdate), format = "%Y%m%d")
+class(m$watchdate)
+
+## Selecting just movies watched in 2021
+## Note: This needs to be modified per year
+m <- m %>%
+  filter(watchdate >= as.Date(as.character(20210101), format = "%Y%m%d"))
+
+## Adding a week column
+m$watchweek = lubridate::week(m$watchdate)
+  
 
 ####### Looking at my overall rating distribution  ##########
 ## Creating a column with rounded rating
@@ -37,18 +48,22 @@ names(rat_dist)[1] = "rating"
 names(rat_dist)[2] = "freq"
 grat_dist = ggplot(data = rat_dist, aes(x =rating, y = freq, fill=rating))
 grat_dist + geom_col() + 
-  labs(title="Distribution of ratings across all movies",x = "Personal Rating", 
+  theme_minimal() +
+  labs(title="Distribution of ratings across all movies watched in 2021",
+       x = "Personal Rating", 
        y = "Number of movies") + 
-  theme(text = element_text(size=15), legend.position = "none")
+  theme(text = element_text(size=13), legend.position = "none")
 
 
 ############## Analysis of by movie release date #########################
 ## Plotting personal rating by year movie was released 
 g = ggplot(data = m, aes(x=year, y=personal_rating, color=genre1))
-ggplotly(g + geom_point() + 
+g + geom_point() + 
+  theme_minimal() +
+  ylim(c(2,10)) +
   labs(title="Personal Rating by Year of Movie Release", 
        y = "Personal Rating (1-10)", x="Year of movie release", 
-       color = "Primary genre") + theme(text = element_text(size=15)))
+       color = "Primary genre") + theme(text = element_text(size=13))
 
 ## Making a decades column
 m$decade = m$year - m$year %% 10
@@ -58,9 +73,10 @@ dec = as.data.frame(table(m$decade))
 names(dec)[1] = "dec"
 names(dec)[2] = "freq"
 gdec = ggplot(data = dec, aes(x = dec, y = freq, fill=dec))
-gdec + geom_col() + labs(title="Movies watched by decade", 
-                         x = "Decade", y = "Total number") + 
-  theme(text = element_text(size=15), legend.position = "none")
+gdec + geom_col() + labs(title="Movies watched in 2021 by decade", 
+                         x = "Decade of movie release", y = "Total number") + 
+  theme_minimal() +
+  theme(text = element_text(size=13), legend.position = "none")
 
 ## Finding the average rating by decade. Then seeing if there's a statistically 
 ## significant difference
@@ -74,6 +90,7 @@ gavgdec = ggplot(data = avgdec, aes(x=decade, y=avg_rating, fill = decade))
 gavgdec + geom_col() + labs(title="Average rating by decade", 
                             y = "Average Personal Rating (1-10)", 
                             x="Decade of movie release") + 
+  theme_minimal() +
   theme(text = element_text(size=15), legend.position = "none")
 
 ## ANOVA to see differences
@@ -91,9 +108,11 @@ names(gen)[2] = "freq"
 ## Reordering it from largest to smallest 
 gen = transform(gen, genre = reorder(genre, -freq))
 ggen = ggplot(data = gen, aes(x=genre, y=freq, fill = genre))
-ggen + geom_col() + labs(title="Movies watched by primary genre", 
-                         x = "Genre", y = "Total number") + 
-  theme(text = element_text(size=15), axis.text.x = element_text(angle = 90), 
+ggen + geom_col() + labs(title="Movies watched in 2021 by primary genre", 
+                         x = "", y = "Total number") + 
+  theme_minimal() +
+  theme(text = element_text(size=15), 
+        axis.text.x = element_text(angle = 90, hjust=0.95), 
         legend.position = "none")
 
 ## Finding the average ratings by genre and then finding if there is a 
@@ -112,8 +131,10 @@ gavgg = ggplot(data = avgg, aes(x=genre1, y = personal_rating.mean,
                                 fill = genre1))
 gavgg + geom_col() + 
   labs(title="Average ratings by primary genre", 
-       x = "Genre", y = "Average Rating (1-10)") + 
-  theme(text = element_text(size=15), axis.text.x = element_text(angle = 90), 
+       x = "", y = "Average Rating (1-10)") + 
+  theme_minimal() +
+  theme(text = element_text(size=15), 
+        axis.text.x = element_text(angle = 0), 
         legend.position = "none")
 
 ## Significant difference between scores?
@@ -133,8 +154,9 @@ rat
 rat = transform(rat, mpa = reorder(mpa, -freq))
 grat = ggplot(data = rat, aes(x=mpa, y=freq, fill = mpa))
 grat + geom_col() + 
-  labs(title="Movies watched in 2020 by MPA Rating", 
-       x = "Rating", y = "Total number") + 
+  labs(title="Movies watched in 2021 by MPA Rating", 
+       x = "Rating", y = "Total number") +
+  theme_minimal() +
   theme(text = element_text(size=15), axis.text.x = element_text(angle = 0), 
         legend.position = "none")
 
@@ -167,46 +189,27 @@ summary(opt_mod)
 paste("Percent error:", 
       round(sigma(opt_mod)*100/mean(lin_frame$personal_rating), digits = 2))
 
-
-
-
-
-
-
-
 ## Plotting by time of year watched the movies
-## Converting dates to class() = date
-m$watchdate = as.Date(as.character(m$watchdate), format = "%Y%m%d")
-class(m$watchdate)
-## Adding a week column
-m$watchweek = strftime(m$watchdate, format = "%V")
-
 ## Plotting the movies watched by week of the year
-##### Note: This is bad and frustrating
-wek = as.data.frame(table(m$watchweek))
-names(wek)[1] = "week"
-names(wek)[2] = "freq"
-wek$week = as.numeric(wek$week)
-wek$freq = as.numeric(wek$freq)
-## There are some missing weeks. Adding them here:
-#w = as.factor(c(02,04,07,09,11,12,15,16,18,27,29,35,38,42,45))
-#length(w)
-#n = as.factor(c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0))
-#length(n)
-#temp = data.frame(w,n)
-#names(temp)[1] = "week"
-#names(temp)[2] = "freq"
-
-addweek = rbind(addweek, 1:52)
-gwek = ggplot(data = m, aes(x=as.numeric(watchweek)))
-gwek + geom_histogram() + labs(title="Movies watched per week of 2020", 
-                               x = "Week", y = "Number per week") + 
-  theme(axis.text.x = element_text(angle = 90))
+m$watchweek = as.numeric(m$watchweek)
+gwek = ggplot(data = m, aes(x=watchweek, fill=genre1))
+gwek + geom_bar() + 
+  labs(title="Movies watched per week of 2021", 
+       x = "Week", y = "Number per week",
+       fill = "Primary Genre") + 
+  theme_minimal() +
+  # scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  theme(text = element_text(size=15), axis.text.x = element_text(angle = 0))
 
 
 ## Plotting the individual movie ratings by date
 ## Need more work on this - want to fill by genre or something
-gdat = ggplot(data = m, aes(x = watchdate, y = personal_rating))
-gdat + geom_jitter(height = 2, width = 2)
-
-
+gdat = ggplot(data = m, aes(x = watchdate, y = personal_rating, color=genre1))
+gdat + geom_point() +
+  labs(title="Movie Ratings by Watch Date", 
+       x = "", y = "Rating",
+       color = "Genre") +
+  ylim(c(2,10)) +
+  theme_minimal() +
+  # scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  theme(text = element_text(size=15), axis.text.x = element_text(angle = 0))
